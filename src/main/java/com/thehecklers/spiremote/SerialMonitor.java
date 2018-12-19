@@ -13,7 +13,7 @@ import java.util.logging.Logger;
 
 import static com.thehecklers.spiremote.LogMonkey.logIt;
 
-//@Service
+@Service
 public class SerialMonitor {
     private static final short NODE0 = 0;   // Default 0==Mark's utility shed concentrator
 
@@ -29,8 +29,12 @@ public class SerialMonitor {
     Properties applicationProps = new Properties();
 
     private SerialThread thread;
+    
+    private ReadingSender sender;
 
-    public SerialMonitor() {
+    public SerialMonitor(ReadingSender sender) {
+        this.sender = sender;
+        
         // Load application properties
         loadProperties();
 
@@ -90,15 +94,6 @@ public class SerialMonitor {
         return isConnected;
     }
 
-//    public static void logIt(String reading) {
-//        if(remoteLog != null){
-//            remoteLog.println(reading);
-//        } else {
-//            System.out.println(reading);
-//        }
-//    }
-
-
     /*
         Configuration file methods - begin
     */
@@ -136,10 +131,10 @@ public class SerialMonitor {
         Configuration file methods - end
     */
 
-    private Reading createBeanFromReading(String reading) {
-        Reading newBean = new Reading();
+    private Reading createNewReading(String reading) {
+        Reading newReading = new Reading();
 
-        newBean.setNode((short)nodeId);
+        newReading.setNode((short)nodeId);
 
         // Remove braces from reading "set"
         reading = reading.substring(1, reading.length() - 2);
@@ -150,19 +145,19 @@ public class SerialMonitor {
                 if(nodeId == NODE0) {
                     switch (x) {
                         case Reading.HUMIDITY:
-                            newBean.setHum(Double.parseDouble(values[x]) / 100);
+                            newReading.setHum(Double.parseDouble(values[x]) / 100);
                             break;
                         case Reading.TEMPERATURE:
-                            newBean.setTemp(Double.parseDouble(values[x]) / 100);
+                            newReading.setTemp(Double.parseDouble(values[x]) / 100);
                             break;
                         case Reading.VOLTAGE:
-                            newBean.setVolts(Double.parseDouble(values[x]) / 1000);
+                            newReading.setVolts(Double.parseDouble(values[x]) / 1000);
                             break;
                         case Reading.CURRENT:
-                            newBean.setCurrent(Double.parseDouble(values[x]) / 1000);
+                            newReading.setCurrent(Double.parseDouble(values[x]) / 1000);
                             break;
                         case Reading.STATUS:
-                            newBean.setStatus(Integer.parseInt(values[x]));
+                            newReading.setStatus(Integer.parseInt(values[x]));
                             break;
                     }
                     //} else { //if (nodeId == NODE1){
@@ -173,7 +168,7 @@ public class SerialMonitor {
             }
         }
 
-        return newBean;
+        return newReading;
     }
 
     public void addToCommand(String cmd) {
@@ -208,7 +203,8 @@ public class SerialMonitor {
                             //setChanged();  MAH (Spring rewrite): This is for Observable
 
                             //notifyObservers(readBuffer);
-                            Reading reading = createBeanFromReading(readBuffer);
+                            Reading reading = createNewReading(readBuffer);
+                            sender.sendReading(reading);
 
                             // MAH (Spring rewrite): Have to write to Rabbit MQ queue here!
 
